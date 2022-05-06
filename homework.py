@@ -36,7 +36,8 @@ HOMEWORK_STATUSES = {
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
     try:
-        button = ReplyKeyboardMarkup([['/check_my_homework']], resize_keyboard=True)
+        button = ReplyKeyboardMarkup([['/check_my_homework']],
+                                     resize_keyboard=True)
 
         bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,
@@ -54,15 +55,15 @@ def get_api_answer(current_timestamp):
     try:
         timestamp = current_timestamp
         params = {'from_date': timestamp}
-        homework_info = requests.get(ENDPOINT, headers=HEADERS, params=params)           
+        homework_info = requests.get(ENDPOINT, headers=HEADERS, params=params)
 
     except Exception:
         logging.error('Недоступность эндпоинта')
         raise Exception('Недоступность эндпоинта')
-    
+
     if homework_info.status_code != HTTPStatus.OK:
         raise Exception('Ошибка status_code')
-    
+
     return homework_info.json()
 
 
@@ -81,13 +82,16 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Извлекает из информации о конкретной домашней работе статус этой работы."""
+    """Извлекает из информации о конкретной
+    домашней работе статус этой работы."""
     homework_name = homework['homework_name']
     homework_status = homework['status']
 
     if not HOMEWORK_STATUSES[homework_status]:
-        logging.debug('Недокументированный статус домашней работы обнаружен в ответе API')
-        raise Exception('Недокументированный статус домашней работы обнаружен в ответе API')
+        logging.debug('Недокументированный статус домашней '
+                      'работы обнаружен в ответе API')
+        raise Exception('Недокументированный статус домашней '
+                        'работы обнаружен в ответе API')
 
     verdict = HOMEWORK_STATUSES[homework_status]
 
@@ -102,12 +106,12 @@ def check_tokens():
         raise Exception
 
     except Exception:
-        logging.critical(f'Отсутствуют обязательные переменные окружения во время запуска бота.')
+        logging.critical('Отсутствуют обязательные переменные '
+                         'окружения во время запуска бота.')
 
 
 def main():
     """Основная логика работы бота."""
-
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time())
 
