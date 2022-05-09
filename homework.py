@@ -12,19 +12,26 @@ import json
 
 
 class Error(Exception):
-    """Base class for other exceptions."""
+    """Базовый класс для исключений."""
+
     pass
 
 
 class UnavailableEndpoint(Error):
-    """Raised when endpoint unavailable."""
+    """Исключение недоступности эндпоинта."""
+
     def __init__(self, message='Эндпоинт practicum.yandex недоступен'):
+        """Возвращает сообщение исключения UnavailableEndpoint."""
         self.message = message
         super().__init__(self.message)
 
+
 class MissingVariables(Error):
+    """Исключение отсутствия обязательных переменных."""
+
     def __init__(self, message='Отсутствуют обязательные переменные '
                                'окружения во время запуска бота'):
+        """Возвращает сообщение исключения MissingVariables."""
         self.message = message
         super().__init__(self.message)
 
@@ -124,9 +131,9 @@ def parse_status(homework):
         verdict = HOMEWORK_STATUSES[homework_status]
     except KeyError:
         logger.debug('Недокументированный статус домашней '
-                      'работы обнаружен в ответе API')
+                     'работы обнаружен в ответе API')
         raise KeyError('Недокументированный статус домашней '
-                        'работы обнаружен в ответе API')
+                       'работы обнаружен в ответе API')
 
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
