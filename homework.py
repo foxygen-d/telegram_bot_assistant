@@ -1,12 +1,32 @@
 import logging
 import os
 import time
+from http import HTTPStatus
 
 import requests
 import telegram
 from dotenv import load_dotenv
 from telegram import ReplyKeyboardMarkup
-from http import HTTPStatus
+
+import json
+
+
+class Error(Exception):
+    """Base class for other exceptions."""
+    pass
+
+
+class UnavailableEndpoint(Error):
+    """Raised when endpoint unavailable."""
+    def __init__(self, message='Эндпоинт practicum.yandex недоступен'):
+        self.message = message
+        super().__init__(self.message)
+
+class MissingVariables(Error):
+    def __init__(self, message='Отсутствуют обязательные переменные '
+                               'окружения во время запуска бота'):
+        self.message = message
+        super().__init__(self.message)
 
 
 logging.basicConfig(
@@ -15,6 +35,7 @@ logging.basicConfig(
     filemode='a',
     format='%(asctime)s %(levelname)s %(message)s'
 )
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -44,33 +65,42 @@ def send_message(bot, message):
             text=message,
             reply_markup=button,
         )
-        logging.info('Удачная отправка сообщения в Telegram')
+        logger.info('Удачная отправка сообщения в Telegram')
 
-    except Exception:
-        logging.error('Сбой при отправке сообщения в Telegram')
+    except telegram.TelegramError:
+        logger.error('Сбой при отправке сообщения в Telegram')
 
 
 def get_api_answer(current_timestamp):
     """Делает запрос к единственному эндпоинту API-сервиса."""
+    timestamp = current_timestamp
+    params = {'from_date': timestamp}
     try:
-        timestamp = current_timestamp
-        params = {'from_date': timestamp}
         homework_info = requests.get(ENDPOINT, headers=HEADERS, params=params)
-
-    except Exception:
-        logging.error('Недоступность эндпоинта')
-        raise Exception('Недоступность эндпоинта')
+    except requests.exceptions.Timeout as e:
+        logger.error('Время ожидания ответа от сервера превысило лимит')
+        raise SystemExit(e)
+    except requests.exceptions.TooManyRedirects as e:
+        logger.error('URL-адрес неправильный, попробуйте другой')
+        raise SystemExit(e)
+    except UnavailableEndpoint as e:
+        logger.error('Эндпоинт practicum.yandex недоступен')
+        raise SystemExit(e)
 
     if homework_info.status_code != HTTPStatus.OK:
         raise Exception('Ошибка status_code')
 
-    return homework_info.json()
+    try:
+        return homework_info.json()
+
+    except json.decoder.JSONDecodeError:
+        logger.error('Это не JSON')
 
 
 def check_response(response):
     """Проверяет ответ API на корректность."""
     if type(response) is not dict:
-        logging.error('API не соответствует ожиданиям')
+        logger.error('API не соответствует ожиданиям')
         raise TypeError('API не соответствует ожиданиям')
     if not response:
         raise Exception('Ответ API содержит пустой словарь')
@@ -83,30 +113,29 @@ def check_response(response):
 
 def parse_status(homework):
     """Извлекает из информации статус домашней работы."""
-    homework_name = homework['homework_name']
-    homework_status = homework['status']
+    try:
+        homework_name = homework['homework_name']
+        homework_status = homework['status']
+    except KeyError:
+        logger.error('Обращение происходит по несуществующему ключу')
+        raise KeyError('Обращение происходит по несуществующему ключу')
 
-    if not HOMEWORK_STATUSES[homework_status]:
-        logging.debug('Недокументированный статус домашней '
+    try:
+        verdict = HOMEWORK_STATUSES[homework_status]
+    except KeyError:
+        logger.debug('Недокументированный статус домашней '
                       'работы обнаружен в ответе API')
-        raise Exception('Недокументированный статус домашней '
+        raise KeyError('Недокументированный статус домашней '
                         'работы обнаружен в ответе API')
-
-    verdict = HOMEWORK_STATUSES[homework_status]
 
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def check_tokens():
     """Проверяет доступность переменных окружения."""
-    try:
-        if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
-            return True
-        raise Exception
-
-    except Exception:
-        logging.critical('Отсутствуют обязательные переменные '
-                         'окружения во время запуска бота.')
+    if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
+        return True
+    return False
 
 
 def main():
@@ -116,7 +145,10 @@ def main():
 
     while True:
         try:
-            check_tokens()
+            if not check_tokens():
+                logger.critical('Отсутствуют обязательные переменные '
+                                'окружения во время запуска бота')
+                raise MissingVariables
             response = get_api_answer(current_timestamp)
             response = check_response(response)
             if response:
