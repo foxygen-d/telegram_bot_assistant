@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import time
@@ -8,32 +9,7 @@ import telegram
 from dotenv import load_dotenv
 from telegram import ReplyKeyboardMarkup
 
-import json
-
-
-class Error(Exception):
-    """Базовый класс для исключений."""
-
-    pass
-
-
-class UnavailableEndpoint(Error):
-    """Исключение недоступности эндпоинта."""
-
-    def __init__(self, message='Эндпоинт practicum.yandex недоступен'):
-        """Возвращает сообщение исключения UnavailableEndpoint."""
-        self.message = message
-        super().__init__(self.message)
-
-
-class MissingVariables(Error):
-    """Исключение отсутствия обязательных переменных."""
-
-    def __init__(self, message='Отсутствуют обязательные переменные '
-                               'окружения во время запуска бота'):
-        """Возвращает сообщение исключения MissingVariables."""
-        self.message = message
-        super().__init__(self.message)
+from exceptions import Error404, MissingVariables, ApiResponseIsEmpty
 
 
 logging.basicConfig(
@@ -84,18 +60,21 @@ def get_api_answer(current_timestamp):
     params = {'from_date': timestamp}
     try:
         homework_info = requests.get(ENDPOINT, headers=HEADERS, params=params)
+    except requests.exceptions.ConnectionError as e:
+        logger.error('Проблемы с подключением, попробуйте ещё раз')
+        raise SystemExit(e)
+    except requests.exceptions.HTTPError as e:
+        logger.error('Недопустимый HTTP-ответ')
+        raise SystemExit(e)
     except requests.exceptions.Timeout as e:
         logger.error('Время ожидания ответа от сервера превысило лимит')
         raise SystemExit(e)
     except requests.exceptions.TooManyRedirects as e:
         logger.error('URL-адрес неправильный, попробуйте другой')
         raise SystemExit(e)
-    except UnavailableEndpoint as e:
-        logger.error('Эндпоинт practicum.yandex недоступен')
-        raise SystemExit(e)
 
     if homework_info.status_code != HTTPStatus.OK:
-        raise Exception('Ошибка status_code')
+        raise Error404
 
     try:
         return homework_info.json()
@@ -110,11 +89,11 @@ def check_response(response):
         logger.error('API не соответствует ожиданиям')
         raise TypeError('API не соответствует ожиданиям')
     if not response:
-        raise Exception('Ответ API содержит пустой словарь')
+        raise ApiResponseIsEmpty
     if 'homeworks' not in response:
-        raise Exception('Отсутствует ожидаемый ключ в ответе API')
+        raise KeyError('Отсутствует ожидаемый ключ в ответе API')
     if type(response.get('homeworks')) is not list:
-        raise Exception('API не соответствует ожиданиям')
+        raise TypeError('API не соответствует ожиданиям')
     return response.get('homeworks')
 
 
