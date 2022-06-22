@@ -9,7 +9,7 @@ import telegram
 from dotenv import load_dotenv
 from telegram import ReplyKeyboardMarkup
 
-from exceptions import Error404, MissingVariables, ApiResponseIsEmpty
+from exceptions import ApiResponseIsEmpty, Error404, MissingVariables
 
 
 logging.basicConfig(
