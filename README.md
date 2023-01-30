@@ -35,6 +35,7 @@
 * клонировать проект на компьютер `git clone https://github.com/foxygen-d/telegram_bot_assistant.git`
 * создание виртуального окружения `python3 -m venv venv`
 * запуск виртуального окружения `. venv/bin/activate`
+* установить зависимости из файла requirements.txt `pip install -r requirements.txt`
 * запуск тестов `pytest`
 
 
